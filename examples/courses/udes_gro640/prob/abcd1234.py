@@ -14,7 +14,7 @@ Fichier d'amorce pour les livrables de la problématique GRO640'
 
 import numpy as np
 
-from pyro.control  import robotcontrollers
+from pyro.control import robotcontrollers
 from pyro.control.robotcontrollers import EndEffectorPD
 from pyro.control.robotcontrollers import EndEffectorKinematicController
 
@@ -23,7 +23,7 @@ from pyro.control.robotcontrollers import EndEffectorKinematicController
 # Part 1
 ###################
 
-def dh2T( r , d , theta, alpha ):
+def dh2T(r, d, theta, alpha):
     """
 
     Parameters
@@ -41,18 +41,33 @@ def dh2T( r , d , theta, alpha ):
             Matrice de transformation
 
     """
-    
-    T = np.zeros((4,4))
-    
     ###################
     # Votre code ici
+    r = np.array([r, 0.0, 0.0])
+    d = np.array([0.0, 0.0, d])
+
+    R3 = np.array([[np.cos(theta), -np.sin(theta), 0.0],
+                   [np.sin(theta), np.cos(theta), 0.0],
+                   [0.0, 0.0, 1.0]])
+
+    R1 = np.array([[1.0, 0.0, 0.0],
+                   [0.0, np.cos(alpha), -np.sin(alpha)],
+                   [0.0, np.sin(alpha), np.cos(alpha)]])
+
+    R = R3*R1
+    test = R3 @ r
+    r_ba = d + R3 @ r
+
+    T = np.array([[R[0, 0], R[0, 1], R[0, 2], r_ba[0]],
+                  [R[1, 0], R[1, 1], R[1, 2], r_ba[1]],
+                  [R[2, 0], R[2, 1], R[2, 2], r_ba[2]],
+                  [0.0    , 0.0    , 0.0    , 1.0]])
     ###################
     
     return T
 
 
-
-def dhs2T( r , d , theta, alpha ):
+def dhs2T(r, d, theta, alpha):
     """
 
     Parameters
@@ -75,6 +90,14 @@ def dhs2T( r , d , theta, alpha ):
     
     ###################
     # Votre code ici
+    n = r.size
+    for i in range(n):
+        T = dh2T(r[i], d[i], theta[i], alpha[i])
+        if i == 0:
+            WTT = T
+        else:
+            WTT = WTT * T
+
     ###################
     
     return WTT
