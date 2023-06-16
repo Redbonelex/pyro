@@ -1,4 +1,4 @@
-from examples.courses.udes_gro640.prob.abcd1234 import dh2T, dhs2T
+from examples.courses.udes_gro640.prob.dura1101 import dh2T, dhs2T
 import numpy as np
 
 

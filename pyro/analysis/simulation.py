@@ -334,7 +334,7 @@ class Simulator:
 
             for i in range(self.n):
                 ti = t_sol[i]
-                xi = x_sol[i,:]
+                xi = x_sol[i, :]
                 ui = self.cds.t2u( ti )
 
                 dx_sol[i,:] = self.cds.f( xi , ui , ti )

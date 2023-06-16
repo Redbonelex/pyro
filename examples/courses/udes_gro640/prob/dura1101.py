@@ -177,6 +177,7 @@ class CustomPositionController( EndEffectorKinematicController ) :
         
         ##################################
         # Votre loi de commande ici !!!
+        dq = np.linalg.inv(J) * (e*J*q)
         ##################################
 
         
@@ -222,8 +223,8 @@ class CustomDrillingController( robotcontrollers.RobotController ) :
         """
         
         # Ref
-        f_e = r
-        
+        #f_e = r
+        f_e = np.array([0, 0, 200])
         # Feedback from sensors
         x = y
         [ q , dq ] = self.x2q( x )
@@ -237,9 +238,11 @@ class CustomDrillingController( robotcontrollers.RobotController ) :
             
         ##################################
         # Votre loi de commande ici !!!
+        J_T = J.T
+        u = -J_T @ f_e
         ##################################
         
-        u = np.zeros(self.m)  # place-holder de bonne dimension
+        #u = np.zeros(self.m)  # place-holder de bonne dimension
         
         return u
         
