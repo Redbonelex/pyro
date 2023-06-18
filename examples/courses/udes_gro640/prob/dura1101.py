@@ -43,27 +43,12 @@ def dh2T(r, d, theta, alpha):
     """
     ###################
     # Votre code ici
-    r = np.array([r, 0.0, 0.0])
-    d = np.array([0.0, 0.0, d])
-
-    R3 = np.array([[np.cos(theta), -np.sin(theta), 0.0],
-                   [np.sin(theta), np.cos(theta), 0.0],
-                   [0.0, 0.0, 1.0]])
-
-    R1 = np.array([[1.0, 0.0, 0.0],
-                   [0.0, np.cos(alpha), -np.sin(alpha)],
-                   [0.0, np.sin(alpha), np.cos(alpha)]])
-
-    R = R3*R1
-    test = R3 @ r
-    r_ba = d + R3 @ r
-
-    T = np.array([[R[0, 0], R[0, 1], R[0, 2], r_ba[0]],
-                  [R[1, 0], R[1, 1], R[1, 2], r_ba[1]],
-                  [R[2, 0], R[2, 1], R[2, 2], r_ba[2]],
-                  [0.0    , 0.0    , 0.0    , 1.0]])
     ###################
-    
+
+    T = np.array([[np.cos(theta), -np.sin(theta) * np.cos(alpha), np.sin(theta) * np.sin(alpha), r * np.cos(theta)],
+                  [np.sin(theta), np.cos(theta) * np.cos(alpha), -np.cos(theta) * np.sin(alpha), r * np.sin(theta)],
+                  [0, np.sin(alpha), np.cos(alpha), d],
+                  [0, 0, 0, 1]])
     return T
 
 
@@ -96,7 +81,7 @@ def dhs2T(r, d, theta, alpha):
         if i == 0:
             WTT = T
         else:
-            WTT = WTT * T
+            WTT = WTT @ T
 
     ###################
     
@@ -123,7 +108,14 @@ def f(q):
     ###################
     # Votre code ici
     ###################
-    
+    l = 0
+
+    r = np.array([0.039, 0.155, 0.135, 0, 0, -0.006])
+    d = np.array([-0.147, 0, 0, 0.081, 0.137, 0.0095 + q[5]])
+    theta = np.array([q[0] - np.pi / 2, q[1] + np.pi / 2, q[2], q[3] + np.pi / 2, q[4] + np.pi / 2, 0])
+    alpha = np.array([np.pi / 2, 0, 0, np.pi / 2, -np.pi / 2, 0])
+    WTT = dhs2T(r, d, theta, alpha)
+    r = np.array([[WTT[0, 3]], [WTT[1, 3]], [WTT[2, 3]]])
     return r
 
 
@@ -142,7 +134,8 @@ class CustomPositionController( EndEffectorKinematicController ) :
         ###################################################
         # Vos paramètres de loi de commande ici !!
         ###################################################
-        
+
+
     
     #############################
     def c( self , y , r , t = 0 ):
@@ -170,16 +163,16 @@ class CustomPositionController( EndEffectorKinematicController ) :
         r_actual    = self.fwd_kin( q )
         
         # Error
-        e  = r_desired - r_actual
+        e = r_desired - r_actual
         
         ################
         dq = np.zeros( self.m )  # place-holder de bonne dimension
         
         ##################################
         # Votre loi de commande ici !!!
-        dq = np.linalg.inv(J) * (e*J*q)
         ##################################
-
+        gain = 0.5
+        dq = np.linalg.inv((J.T @ J + gain**2*np.identity(self.dof))) @ J.T @ e
         
         return dq
     
@@ -223,8 +216,8 @@ class CustomDrillingController( robotcontrollers.RobotController ) :
         """
         
         # Ref
+
         #f_e = r
-        f_e = np.array([0, 0, 200])
         # Feedback from sensors
         x = y
         [ q , dq ] = self.x2q( x )
@@ -235,15 +228,24 @@ class CustomDrillingController( robotcontrollers.RobotController ) :
         g = self.robot_model.g( q )      # Gravity vector
         H = self.robot_model.H( q )      # Inertia matrix
         C = self.robot_model.C( q , dq ) # Coriolis matrix
-            
         ##################################
         # Votre loi de commande ici !!!
-        J_T = J.T
-        u = -J_T @ f_e
         ##################################
-        
-        #u = np.zeros(self.m)  # place-holder de bonne dimension
-        
+
+        r_d = np.array([0.25, 0.25, 0.45])
+        f_d = np.array([0, 0, -200])
+        r_e = r_d - r
+        q_d = np.linalg.inv(J) @ r
+        J_T = J.T
+
+        Kp = np.diag([20, 20, 20])
+        Kd = np.diag([10, 10, 10])
+
+        if np.linalg.norm(r_e) > 0.01:
+            u = J.T @ (Kp @ r_e + Kd @ (-J @ dq)) + g
+        else:
+            u = J_T @ f_d + g
+
         return u
         
     
@@ -252,7 +254,7 @@ class CustomDrillingController( robotcontrollers.RobotController ) :
 ###################
         
     
-def goal2r( r_0 , r_f , t_f ):
+def goal2r(r_0,r_f, t_f):
     """
     
     Parameters
@@ -284,8 +286,18 @@ def goal2r( r_0 , r_f , t_f ):
     #################################
     # Votre code ici !!!
     ##################################
-    
-    
+
+    dir_vect = r_f - r_0
+    v = dir_vect / t_f
+    t_increment = t_f / l
+    dir_increment = v * t_increment
+
+    for i in range(l):
+        r[:,i] = r_0 + i * dir_increment
+        dr[:,i] = v
+        ddr[:,i] = np.zeros(3)
+    print(r[:,0])
+    print(r[:,l-1])
     return r, dr, ddr
 
 
@@ -309,19 +321,37 @@ def r2q( r, dr, ddr , manipulator ):
     """
     # Time discretization
     l = r.shape[1]
-    
+
     # Number of DoF
-    n = 3
-    
+    n = manipulator.dof
+    # arm length
+    l1 = manipulator.l1
+    l2 = manipulator.l2
+    l3 = manipulator.l3
+
     # Output dimensions
     q = np.zeros((n,l))
     dq = np.zeros((n,l))
     ddq = np.zeros((n,l))
-    
+
     #################################
     # Votre code ici !!!
     ##################################
-    
+
+    for i in range(l):  # Loop over time steps
+        # Calculate joint angles using inverse kinematics equations
+        q[0, i] = np.arctan2(r[1, i], r[0, i])
+        q[1, i] = np.arctan2(r[2, i] - l2, np.sqrt(r[0, i] ** 2 + r[1, i] ** 2))
+        q[2, i] = np.arctan2(np.sqrt(r[0, i] ** 2 + r[1, i] ** 2) - l3, r[2, i] - l2)
+
+        # Calculate joint velocities using numerical differentiation
+        # if i > 0:
+        #     dq[:, i] = (q[:, i] - q[:, i - 1]) / (1.0 / dt)
+        #
+        # # Calculate joint accelerations using numerical differentiation
+        # if i > 1:
+        #     ddq[:, i] = (dq[:, i] - dq[:, i - 1]) / (1.0 / dt)
+
     
     return q, dq, ddq
 

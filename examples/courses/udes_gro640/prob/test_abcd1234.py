@@ -1,4 +1,4 @@
-from examples.courses.udes_gro640.prob.dura1101 import dh2T, dhs2T
+from examples.courses.udes_gro640.prob.dura1101 import dh2T, dhs2T, f
 import numpy as np
 
 
@@ -19,3 +19,11 @@ def test_dhs2T():
     alpha = np.array([-np.pi/2, -np.pi/3, -np.pi/4])
     T = dhs2T(r, d, theta, alpha)
     assert T.shape == (4, 4)
+
+
+def test_kuka():
+    q = np.array([0, 0, 0, 0, 0, 0])
+    r = f(q)
+    print(r)
+    assert r.shape == (3, 1)
+

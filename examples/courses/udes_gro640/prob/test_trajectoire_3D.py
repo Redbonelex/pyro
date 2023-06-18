@@ -18,6 +18,7 @@ t_f = 3.0                             # duration
 # Compute the trajectory of the effector
 r, dr, ddr = goal2r( r_0 , r_f , t_f )
 
+
 n = r.shape[1] # Number of time steps
 
 # Compute the trajectory of the joints
@@ -45,7 +46,6 @@ dq3 = dq[2,:]
 
 sys = DrillingRobot()
 sys.compute_trajectory( t_f , n ) # little hack to use the plotting tool without simulations
-
 sys.traj.t       = t
 sys.traj.x[:,0]  = q1
 sys.traj.x[:,1]  = q2
