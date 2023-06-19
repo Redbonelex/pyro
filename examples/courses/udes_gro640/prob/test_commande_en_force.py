@@ -10,7 +10,7 @@ import matplotlib
 
 from gro640_robots import DrillingRobot
 from gro640_robots import DrillingRobotOnJig
-from dura1101      import CustomDrillingController
+from vaul0801      import CustomDrillingController
 
 
 # Model dynamique du robot

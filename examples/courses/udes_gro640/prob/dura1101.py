@@ -122,7 +122,8 @@ def f(q):
     T = dh2T(r, d, theta, alpha)
     # WTT = dhs2T(r, d, theta, alpha)
     # r = np.array([[WTT[0, 3]], [WTT[1, 3]], [WTT[2, 3]]])
-    r = np.array([[T[0, 3]], [T[1, 3]], [T[2, 3]]])
+    r = T @ q
+    #r = np.array([[T[0, 3]], [T[1, 3]], [T[2, 3]]])
     return r
 
 
@@ -206,63 +207,52 @@ class CustomDrillingController( robotcontrollers.RobotController ) :
         # Label
         self.name = 'Custom Drilling Controller'
 
-        self.flag = False
+        self.drill = False
+        self.drill_end = False
         
         
     #############################
     def c( self , y , r , t = 0 ):
         """ 
         Feedback static computation u = c(y,r,t)
-        
         INPUTS
         y  : sensor signal vector     p x 1
         r  : reference signal vector  k x 1
         t  : time                     1 x 1
-        
         OUPUTS
         u  : control inputs vector    m x 1
         
         """
-        
-        # Ref
-
-        #f_e = r
         # Feedback from sensors
         x = y
         [ q , dq ] = self.x2q( x )
-        
         # Robot model
         r = self.robot_model.forward_kinematic_effector( q ) # End-effector actual position
         J = self.robot_model.J( q )      # Jacobian matrix
         g = self.robot_model.g( q )      # Gravity vector
-        H = self.robot_model.H( q )      # Inertia matrix
-        C = self.robot_model.C( q , dq ) # Coriolis matrix
         ##################################
         # Votre loi de commande ici !!!
         ##################################
-
         r_d = np.array([0.25, 0.25, 0.41])
         r_drill = np.array([0.25, 0.25, 0.20])
+
         f_d = np.array([0, 0, -200])
         r_e = r_d - r
-        q_d = np.linalg.inv(J) @ r
-        J_T = J.T
+        r_e_drill = r_drill - r
 
         Kp = np.diag([15, 15, 15])
         Kd = np.diag([10, 10, 10])
+        Kp_drill = np.diag([50, 50, 50])
+        Kd_drill = np.diag([20, 20, 0])
 
         if np.linalg.norm(r_e) < 0.01:
-            self.flag = True
+            self.drill = True
 
-        if self.flag is False:
+        if self.drill is False:
             u = J.T @ (Kp @ r_e + Kd @ (-J @ dq)) + g
-        elif self.flag is True:
-            # u = J_T @ f_d + g
-            r_e = r_drill - r
-            Kp = np.diag([15, 15, 0])
-            Kd = np.diag([10, 10, 0])
-            u = J.T @ (Kp @ r_e + Kd @ (-J @ dq) + f_d) + g
-
+        elif self.drill is True:
+            # u = J.T @ f_d + g
+            u = J.T @ (Kp_drill @ r_e_drill + Kd_drill @ (-J @ dq) + f_d) + g
         return u
         
     

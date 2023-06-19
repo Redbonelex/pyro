@@ -8,7 +8,7 @@ Created on Fri May  1 19:51:49 2020
 import numpy as np
 
 from gro640_robots import DrillingRobot
-from dura1101      import goal2r, r2q # Load your functions
+from vaul0801      import goal2r, r2q # Load your functions
 
 # Define end-effector motion
 r_0 = np.array([  0.5,   0.0,   1.0]) # start

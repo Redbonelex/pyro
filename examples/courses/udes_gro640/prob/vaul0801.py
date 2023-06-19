@@ -88,7 +88,7 @@ def dhs2T( r , d , theta, alpha ):
     
     for i in range(n):
         T = dh2T(r[i],d[i],theta[i],alpha[i])
-        print("T : ", T)
+        #print("T : ", T)
         if i == 0:
             WTT = T
         else:
@@ -123,7 +123,7 @@ def f(q):
     alpha = np.array([-np.pi/2, 0, 0, np.pi/2, 0, 0])
     WTT = dhs2T(r, d, theta, alpha)
     
-    print("WTT", WTT)
+    print("\nWTT: ", WTT)
     
     u[0] = WTT[0,3]
     u[1] = WTT[1,3]
@@ -216,6 +216,8 @@ class CustomDrillingController( robotcontrollers.RobotController ) :
         # Label
         self.name = 'Custom Drilling Controller'
         
+        self.flag = False
+        
         
     #############################
     def c( self , y , r , t = 0 ):
@@ -253,8 +255,9 @@ class CustomDrillingController( robotcontrollers.RobotController ) :
         u = np.zeros(self.m)  # place-holder de bonne dimension
         
         
-        r_d = np.array([0.25, 0.25, 0.45])
-        r_d_drill = np.array([0.25, 0.25 , 0])
+        r_d = np.array([0.25, 0.25, 0.41])
+        r_d_drill = np.array([0.25, 0.25 , 0.20])
+        f_d = np.array([0, 0, -200])
         Kp = np.diag([15,15,15])
         Kd = np.diag([10,10,10])
         Kp_drill = np.diag([200,200,200])
@@ -262,27 +265,17 @@ class CustomDrillingController( robotcontrollers.RobotController ) :
         
         r_e = r_d - r
         
-        r_e_xy = np.zeros((2,1))        
-        r_e_xy[0] = r_d[0] - r[0]
-        r_e_xy[1] = r_d[1] - r[1]
         
-        #if np.linalg.norm(r_e) > 0.01:
-         #   t_f = t
+        if np.linalg.norm(r_e) < 0.01:
+            self.flag = True
         
-        #if t > t_f:
+        if self.flag is False:
+            u = J.T @ (Kp @ (r_d-r) + Kd @ (- J @ dq)) + g
             
-            
-        #u = J.T @ (Kp @ (r_d-r) + Kd @ (- J @ dq)) + g
-        u = J.T @ (Kp @ (r_d_drill-r) + Kd @ (- J @ dq)) + g
+        elif self.flag is True:
+            #u = J.T @ f_d + g
+            u = J.T @ (Kp @ (r_d_drill-r) + Kd @ (- J @ dq) + f_d) + g
         
-        #print("norm r_e : ", t)
-        
-        
-        # if np.linalg.norm(r_e_xy) > 0.01 :
-        #     u = J.T @ (Kp @ (r_d-r) + Kd @ (- J @ dq)) + g
-                
-        # else:
-        #     u = J.T @ (Kp @ (r_d_drill-r) + Kd @ (- J @ dq)) + g
 
         return u
         
@@ -324,51 +317,45 @@ def goal2r( r_0 , r_f , t_f ):
     #################################
     # Votre code ici !!!
     ##################################
-    
-    #dir_vect = r_f - r_0
-    vect = r_f - r_0
+
     v_norm = np.linalg.norm(r_f - r_0)
-    dir_vect = (r_f - r_0) / v_norm
-    v_dir = vect / t_f
+
     dt = t_f/l
-    dir_increment = v_dir * dt
-    
-    print("vect : ",vect)
-    print("v_norm : ",v_norm)
-    print("dir_vect : ",dir_vect)
     
     v = 0.5
     a = v**2/(t_f*v-v_norm)
     
-    
     t = 0
     i = 0
+    
     while t <= (v/a):
-        r[:,i] = r_0 + (1/2*a*t**2)
-        dr[:,i] = a*t*dir_vect
-        ddr[:,i] = a*dir_vect
+        r[:,i] = r_0 + (r_f-r_0)*(1/2*a*t**2)
+        dr[:,i] = (r_f-r_0)*a*t
+        ddr[:,i] = (r_f-r_0)*a
         t = t + dt
         i = i + 1
     
     while t > v/a and t <= t_f-v/a:
-        r[:,i] = r_0 + (v*t-(v**2/(2*a)))
-        dr[:,i] = v * dir_vect
-        ddr[:,i] = 0
+        r[:,i] = r_0 + (r_f-r_0)*(v*t-(v**2/(2*a)))
+        dr[:,i] = (r_f-r_0)*v
+        ddr[:,i] = (r_f-r_0)*0
         t = t + dt
         i = i + 1
         
     while t > t_f-v/a and t <= t_f:
-        r[:,i] = r_0 + (2*a*v*t_f-2*v**2-a**2*(t-t_f)**2)/(2*a)
-        dr[:,i] = a*(t_f-t)*dir_vect
-        ddr[:,i] = -a*dir_vect
+        r[:,i] = r_0 + (r_f-r_0)*(2*a*v*t_f-2*v**2-a**2*(t-t_f)**2)/(2*a)
+        dr[:,i] = (r_f-r_0)*a*(t_f-t)
+        ddr[:,i] = (r_f-r_0)*-a
         t = t + dt
         i = i + 1
-
-        
-    print("r :", r)
-    print("dr :", dr)
-    print("ddr :", ddr)
     
+    # while t <= t_f:
+    #     r[:,i] = r_0 + (r_f-r_0)*(3/t_f**2*t**2 - 2/t_f**3*t**3)
+    #     dr[:,i] = (r_f-r_0)*(6/t_f**2*t - 6/t_f**3*t**2)
+    #     ddr[:,i] = (r_f-r_0)*(6/t_f**2 - 12/t_f**3*t)
+    #     t = t + dt
+    #     i = i + 1
+
     
     return r, dr, ddr
 
@@ -407,62 +394,27 @@ def r2q( r, dr, ddr , manipulator ):
     # Votre code ici !!!
     ##################################
     
-    l1 = manipulator.l1
-    l2 = manipulator.l2
-    l3 = manipulator.l3
-    
+    x0 = np.array([0.1, 1, -1])
     J = np.zeros((3,3))
     
     for i in range(l):
-        c1  = np.cos( q[0,i] )
-        s1  = np.sin( q[0,i] )
-        c2  = np.cos( q[1,i] )
-        s2  = np.sin( q[1,i] )
-        c3  = np.cos( q[2,i] )
-        s3  = np.sin( q[2,i] )
-        c23 = np.cos( q[2,i] + q[1,i] )
-        s23 = np.sin( q[2,i] + q[1,i] )
-        
-        #c1,s1,c2,s2,c3,s3,c23,s23 = manipulator.trig(q)
-        #print("c1", c1)
-        
         def func(q):
-            return ([c1*(l2*s2+l3*s23),
-                     l1+l2*c2+l3*c23,
-                     s1*(l2*s2+l3*s23)])
+            r_t = manipulator.forward_kinematic_effector(q)
+            return ([r[0,i] - r_t[0],
+                     r[1,i] - r_t[1],
+                     r[2,i] - r_t[2]])
         
-        q_inter = fsolve(func, [r[0,i], r[1,i], r[2,i]])
+        q_inter = fsolve(func, x0)
         q[0,i] = q_inter[0]
         q[1,i] = q_inter[1]
         q[2,i] = q_inter[2]
+        x0 = np.array([q_inter[0], q_inter[1], q_inter[2]])
         
-        c1  = np.cos( q[0,i] )
-        s1  = np.sin( q[0,i] )
-        c2  = np.cos( q[1,i] )
-        s2  = np.sin( q[1,i] )
-        c3  = np.cos( q[2,i] )
-        s3  = np.sin( q[2,i] )
-        c23 = np.cos( q[2,i] + q[1,i] )
-        s23 = np.sin( q[2,i] + q[1,i] )
-        
-        J = ([[-s1*(l2*s2+l3*s23), c1*(l2*c2+l3*c23), l3*c1*c23],
-                   [0, -l2*s2-l3*s23, -l3*s23],
-                   [c1*(l2*s2+l3*s23), s1*(l2*c2+l3*c23), s1*l3*c23]])
+        J = manipulator.J(q_inter)
         
         dq[:,i] = np.linalg.inv(J) @ dr[:,i]
         
-        #J_inv = np.linalg.inv(J)
-        
-        #ddq[:,i] = J_inv @ (ddr[:,i] - J_d @ dq[:,i])
-        
-        
         # Fin boucle "for"
-
-    
-    print("q :", q)
-    print("dq :", dq)
-    
-    
     
     return q, dq, ddq
 
@@ -496,6 +448,8 @@ def q2torque( q, dq, ddq , manipulator ):
     #################################
     # Votre code ici !!!
     ##################################
+    
+    tau = manipulator.actuator_forces(q, dq, ddq)
     
     
     return tau
