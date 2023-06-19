@@ -1,4 +1,4 @@
-from examples.courses.udes_gro640.prob.vaul0801 import dh2T, dhs2T, f
+from examples.courses.udes_gro640.prob.dura1101 import dh2T, dhs2T, f
 import numpy as np
 
 
@@ -24,6 +24,6 @@ def test_dhs2T():
 def test_kuka():
     q = np.array([0, 0, 0, 0, 0, 0])
     r = f(q)
-    print("\nr:" ,r)
+    print("\nr: " ,r)
     assert r.shape == (3, 1)
 

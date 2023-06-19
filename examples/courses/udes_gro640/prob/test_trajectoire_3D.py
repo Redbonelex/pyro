@@ -6,9 +6,10 @@ Created on Fri May  1 19:51:49 2020
 @author: alex
 """
 import numpy as np
+from matplotlib import pyplot as plt
 
 from gro640_robots import DrillingRobot
-from vaul0801      import goal2r, r2q # Load your functions
+from dura1101      import goal2r, r2q, q2torque # Load your functions
 
 # Define end-effector motion
 r_0 = np.array([  0.5,   0.0,   1.0]) # start
@@ -24,6 +25,7 @@ n = r.shape[1] # Number of time steps
 # Compute the trajectory of the joints
 model      = DrillingRobot() # Robot Model
 q, dq, ddq = r2q( r, dr, ddr , model  )
+tau = q2torque( q, dq, ddq , model  )
 
 t   = np.linspace(0, t_f, n)   # t
 q1  = q[0,:]

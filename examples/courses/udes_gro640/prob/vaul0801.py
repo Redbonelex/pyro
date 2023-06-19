@@ -117,13 +117,13 @@ def f(q):
     # Votre code ici
     ###################
     
-    r = np.array([0.039, 0.155, 0.135, 0.081, 0.137, 0])
+    r = np.array([0.039, 0.155, 0.135, 0.081, 0, 0.137])
     d = np.array([0.147, 0, 0, 0, 0, q[5]])
     theta = np.array([q[0], q[1]-np.pi/2, q[2], q[3], q[4], 0])
-    alpha = np.array([-np.pi/2, 0, 0, np.pi/2, 0, 0])
+    alpha = np.array([-np.pi/2, 0, 0, np.pi/2, 0, np.pi/2])
     WTT = dhs2T(r, d, theta, alpha)
     
-    print("\nWTT: ", WTT)
+    #print("WTT", WTT)
     
     u[0] = WTT[0,3]
     u[1] = WTT[1,3]
@@ -247,7 +247,6 @@ class CustomDrillingController( robotcontrollers.RobotController ) :
         g = self.robot_model.g( q )      # Gravity vector
         H = self.robot_model.H( q )      # Inertia matrix
         C = self.robot_model.C( q , dq ) # Coriolis matrix
-            
         ##################################
         # Votre loi de commande ici !!!
         ##################################
@@ -318,12 +317,10 @@ def goal2r( r_0 , r_f , t_f ):
     # Votre code ici !!!
     ##################################
 
-    v_norm = np.linalg.norm(r_f - r_0)
-
     dt = t_f/l
     
     v = 0.5
-    a = v**2/(t_f*v-v_norm)
+    a = v**2/(t_f*v-1)
     
     t = 0
     i = 0

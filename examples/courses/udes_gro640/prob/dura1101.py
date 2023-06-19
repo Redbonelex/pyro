@@ -3,7 +3,7 @@
 """
 Created on Thu May 14 23:19:16 2020
 
-@author: alex
+@author: alexandre Durand
 ------------------------------------
 
 
@@ -13,10 +13,9 @@ Fichier d'amorce pour les livrables de la problématique GRO640'
 """
 
 import numpy as np
-from scipy.optimize import fsolve, newton
+from scipy.optimize import fsolve
 
 from pyro.control import robotcontrollers
-from pyro.control.robotcontrollers import EndEffectorPD
 from pyro.control.robotcontrollers import EndEffectorKinematicController
 
 
@@ -72,7 +71,7 @@ def dhs2T(r, d, theta, alpha):
 
     """
     
-    WTT = np.zeros((4,4))
+    WTT = np.zeros((4, 4))
     
     ###################
     # Votre code ici
@@ -111,19 +110,13 @@ def f(q):
     ###################
     l = 0
 
-    r = 0.039
-    # 0.155, 0.135, 0, 0, -0.006]
-    d = -0.147
-    # 0, 0, 0.081, 0.137, 0.0095 + q[5]]
-    theta = q[0] - np.pi / 2
-    # q[1] + np.pi / 2, q[2], q[3] + np.pi / 2, q[4] + np.pi / 2, 0
-    alpha = np.pi / 2
-    # 0, 0, np.pi / 2, -np.pi / 2, 0)
-    T = dh2T(r, d, theta, alpha)
-    # WTT = dhs2T(r, d, theta, alpha)
-    # r = np.array([[WTT[0, 3]], [WTT[1, 3]], [WTT[2, 3]]])
-    r = T @ q
-    #r = np.array([[T[0, 3]], [T[1, 3]], [T[2, 3]]])
+    r = np.array([0.039, 0.155, 0.135, 0.081, 0, 0.137])
+    d = np.array([0.147, 0, 0, 0, 0, q[5]])
+    theta = np.array([q[0], q[1] - np.pi / 2, q[2], q[3], q[4], 0])
+    alpha = np.array([-np.pi / 2, 0, 0, np.pi / 2, 0, np.pi / 2])
+    WTT = dhs2T(r, d, theta, alpha)
+    r = np.array([[WTT[0, 3]], [WTT[1, 3]], [WTT[2, 3]]])
+
     return r
 
 
@@ -192,15 +185,11 @@ class CustomPositionController( EndEffectorKinematicController ) :
 
         
 class CustomDrillingController( robotcontrollers.RobotController ) :
-    """ 
-
-    """
-    
     ############################
     def __init__(self, robot_model ):
         """ """
         
-        super().__init__( dof = 3 )
+        super().__init__(dof=3)
         
         self.robot_model = robot_model
         
@@ -209,9 +198,8 @@ class CustomDrillingController( robotcontrollers.RobotController ) :
 
         self.drill = False
         self.drill_end = False
-        
-        
     #############################
+
     def c( self , y , r , t = 0 ):
         """ 
         Feedback static computation u = c(y,r,t)
@@ -242,7 +230,7 @@ class CustomDrillingController( robotcontrollers.RobotController ) :
 
         Kp = np.diag([15, 15, 15])
         Kd = np.diag([10, 10, 10])
-        Kp_drill = np.diag([50, 50, 50])
+        Kp_drill = np.diag([50, 50, 0])
         Kd_drill = np.diag([20, 20, 0])
 
         if np.linalg.norm(r_e) < 0.01:
@@ -251,8 +239,8 @@ class CustomDrillingController( robotcontrollers.RobotController ) :
         if self.drill is False:
             u = J.T @ (Kp @ r_e + Kd @ (-J @ dq)) + g
         elif self.drill is True:
-            # u = J.T @ f_d + g
-            u = J.T @ (Kp_drill @ r_e_drill + Kd_drill @ (-J @ dq) + f_d) + g
+            # u = J.T @ f_d + g  # no impedence control
+            u = J.T @ (Kp_drill @ r_e_drill + Kd_drill @ (-J @ dq) + f_d) + g  # with impedence control
         return u
         
     
@@ -294,17 +282,35 @@ def goal2r(r_0,r_f, t_f):
     # Votre code ici !!!
     ##################################
 
-    dir_vect = r_f - r_0
-    v = dir_vect / t_f
-    t_increment = t_f / l
-    dir_increment = v * t_increment
+    dt = t_f / l
 
-    for i in range(l):
-        r[:,i] = r_0 + i * dir_increment
-        dr[:,i] = v
-        ddr[:,i] = np.zeros(3)
-    print(r[:,0])
-    print(r[:,l-1])
+    v = 0.5
+    a = v ** 2 / (t_f * v - 1)
+
+    t = 0
+    i = 0
+
+    while t <= (v / a):
+        r[:, i] = r_0 + (r_f - r_0) * (1 / 2 * a * t ** 2)
+        dr[:, i] = (r_f - r_0) * a * t
+        ddr[:, i] = (r_f - r_0) * a
+        t = t + dt
+        i = i + 1
+
+    while t > v / a and t <= t_f - v / a:
+        r[:, i] = r_0 + (r_f - r_0) * (v * t - (v ** 2 / (2 * a)))
+        dr[:, i] = (r_f - r_0) * v
+        ddr[:, i] = (r_f - r_0) * 0
+        t = t + dt
+        i = i + 1
+
+    while t > t_f - v / a and t <= t_f:
+        r[:, i] = r_0 + (r_f - r_0) * (2 * a * v * t_f - 2 * v ** 2 - a ** 2 * (t - t_f) ** 2) / (2 * a)
+        dr[:, i] = (r_f - r_0) * a * (t_f - t)
+        ddr[:, i] = (r_f - r_0) * -a
+        t = t + dt
+        i = i + 1
+
     return r, dr, ddr
 
 
@@ -328,7 +334,6 @@ def r2q( r, dr, ddr , manipulator ):
     """
     # Time discretization
     l = r.shape[1]
-
     # Number of DoF
     n = manipulator.dof
     # arm length
@@ -340,13 +345,12 @@ def r2q( r, dr, ddr , manipulator ):
     q = np.zeros((n,l))
     dq = np.zeros((n,l))
     ddq = np.zeros((n,l))
-
     #################################
     # Votre code ici !!!
     ##################################
-    x0 = np.array([0.1, 1, -1])
-    J = np.zeros((3, 3))
 
+
+    x0 = np.array([0.1, 1, -1])
 
     for i in range(l):
         def func(q):
@@ -362,14 +366,29 @@ def r2q( r, dr, ddr , manipulator ):
         q[2, i] = q_inter[2]
 
         J = manipulator.J(q_inter)
-        # J = np.array([[-np.sin(q[0, i]) * (l2 * np.sin(q[1, i]) + l3 * np.sin(q[1, i] + q[2, i])), np.cos(q[0, i]) * (l2 * np.cos(q[1, i]) + l3 * np.cos(q[1, i]+q[2, i])), l3 * np.cos(q[0, i]) * np.cos(q[1, i]+q[2, i])],
-        #       [0, -l2 * np.sin(q[1, i]) - l3 * np.sin(q[1, i] + q[2, i]), -l3 * np.sin(q[1, i] + q[2, i])],
-        #       [np.cos(q[0, i]) * (l2 * np.sin(q[1, i]) + l3 * np.sin(q[1, i] + q[2, i])), np.sin(q[0, i]) * (l2 * np.cos(q[1, i]) + l3 * np.cos(q[1, i]+q[2, i])), np.sin(q[0, i]) * l3 * np.cos(q[1, i]+q[2, i])]])
-
         dq[:, i] = np.linalg.inv(J) @ dr[:, i]
-    
-    return q, dq, ddq
 
+        # Calcul dJ
+        def dJ(q):
+            [c1, s1, c2, s2, c3, s3, c23, s23] = manipulator.trig(q)
+            # Calcul des dérivées partielles
+            J_deriv_theta1 = np.array([[-s1 * (l3 * c23 + l2 * c2), -c1 * (l3 * s23 + l2 * s2), -l3 * s23 * c1],
+                                       [c1 * (l3 * c23 + l2 * c2), -s1 * (l3 * s23 + l2 * s2), -l3 * s23 * s1],
+                                       [0, l3 * c23 + l2 * c2, l3 * c23]])
+
+            J_deriv_theta2 = np.array([[c1 * (-l3 * s23 - l2 * s2), -c1 * (l3 * c23 + l2 * c2), 0],
+                                       [s1 * (-l3 * s23 - l2 * s2), -s1 * (l3 * c23 + l2 * c2), 0],
+                                       [0, -l3 * s23 - l2 * s2, 0]])
+
+            J_deriv_theta3 = np.array([[-l3 * s23 * c1, -l3 * s23 * s1, 0],
+                                       [-l3 * s23 * s1, l3 * s23 * c1, 0],
+                                       [0, l3 * c23, 0]])
+            dJ = J_deriv_theta1 + J_deriv_theta2 + J_deriv_theta3
+            return dJ
+        # Calcul de ddq
+        dJ = dJ(q[:, i])
+        ddq[:, i] = np.linalg.inv(J) @ (ddr[:, i] - dJ @ dq[:, i])
+    return q, dq, ddq
 
 
 def q2torque( q, dq, ddq , manipulator ):
@@ -400,6 +419,7 @@ def q2torque( q, dq, ddq , manipulator ):
     #################################
     # Votre code ici !!!
     ##################################
-    tau = manipulator.actuator_forces(q, dq, ddq)
+    for i in range(l):
+        tau[:, i] = manipulator.actuator_forces(q[:, i], dq[:, i], ddq[:, i])
     
     return tau
